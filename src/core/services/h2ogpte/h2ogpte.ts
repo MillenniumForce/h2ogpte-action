@@ -118,13 +118,32 @@ export async function createChatSession(
 export async function requestAgentCompletion(
   sessionId: string,
   prompt: string,
-  config?: types.H2ogpteConfig,
+  config?: types.ExtendedH2ogpteConfig,
   systemPrompt?: string,
   timeoutMinutes: number = 30,
   maxRetries: number = 1,
   retryDelay: number = 1000,
 ): Promise<types.ChatResponse> {
-  const { apiKey, apiBase } = getH2ogpteConfig();
+  // Default to h2oGPTe if no provider is specified
+  const provider = config?.provider || "h2ogpte";
+  let apiKey: string;
+  let apiBase: string;
+
+  if (provider === "h2ogpte") {
+    // Use standard h2oGPTe configuration
+    const h2ogpteConfig = getH2ogpteConfig();
+    apiKey = h2ogpteConfig.apiKey;
+    apiBase = h2ogpteConfig.apiBase;
+  } else if (config?.provider_api_key && config?.provider_api_base) {
+    // Use external provider configuration
+    apiKey = config.provider_api_key;
+    apiBase = config.provider_api_base;
+  } else {
+    return {
+      success: false,
+      body: `Provider '${provider}' is configured but API key or base URL is missing. Please check your configuration.`,
+    };
+  }
 
   const agentCompletionConfig = {
     message: prompt,
@@ -138,6 +157,7 @@ export async function requestAgentCompletion(
     tags: ["github_action_trigger"],
     stream: true,
     ...(systemPrompt && { system_prompt: systemPrompt }),
+    ...(provider !== "h2ogpte" && { provider: provider }),
   };
 
   console.debug(
@@ -193,12 +213,7 @@ export async function requestAgentCompletion(
       body: "Failed to receive completion from h2oGPTe with unknown error",
     };
   }
-}
-
-/**
- * Deletes agent key with retry mechanism
- */
-export async function deleteAgentKey(
+}export async function deleteAgentKey(
   keyId: string,
   maxRetries: number = 3,
   retryDelay: number = 1000,
