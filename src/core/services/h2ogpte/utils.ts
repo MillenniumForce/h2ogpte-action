@@ -1,4 +1,5 @@
-import type { StreamingChunk, H2ogpteConfig } from "./types";
+import type { StreamingChunk, H2ogpteConfig, ExtendedH2ogpteConfig } from "./types";
+import { getLLMProvider } from "./providers";
 
 /**
  * Gets H2OGPTE configuration from environment variables
@@ -12,6 +13,31 @@ export function getH2ogpteConfig(): { apiKey: string; apiBase: string } {
   }
   if (!apiBase) {
     throw new Error("H2OGPTE_API_BASE environment variable is required");
+  }
+
+  return { apiKey, apiBase };
+}
+
+/**
+ * Gets provider configuration from environment variables
+ */
+export function getProviderConfig(providerId: string): { apiKey: string; apiBase: string } | null {
+  const provider = getLLMProvider(providerId);
+  if (!provider) {
+    return null;
+  }
+
+  const apiKey = process.env[provider.apiKeyEnvVar];
+  if (!apiKey) {
+    return null;
+  }
+
+  let apiBase = provider.defaultApiBase || "";
+  if (provider.apiBaseEnvVar) {
+    const envApiBase = process.env[provider.apiBaseEnvVar];
+    if (envApiBase) {
+      apiBase = envApiBase;
+    }
   }
 
   return { apiKey, apiBase };
@@ -45,11 +71,12 @@ export function parseStreamingAgentResponse(
 /**
  * Parse h2oGPTe configuration from GitHub action inputs
  */
-export function parseH2ogpteConfig(): H2ogpteConfig {
+export function parseH2ogpteConfig(): ExtendedH2ogpteConfig {
   const llm = process.env.LLM;
   const agent_max_turns = process.env.AGENT_MAX_TURNS;
   const agent_accuracy = process.env.AGENT_ACCURACY;
   const agent_total_timeout_raw = process.env.AGENT_TOTAL_TIMEOUT;
+  const provider = process.env.LLM_PROVIDER;
   let agent_total_timeout = 3600; // default value
 
   if (agent_total_timeout_raw !== undefined && agent_total_timeout_raw !== "") {
@@ -74,10 +101,25 @@ export function parseH2ogpteConfig(): H2ogpteConfig {
     );
   }
 
+  // Get provider configuration if specified
+  let provider_api_key: string | undefined;
+  let provider_api_base: string | undefined;
+
+  if (provider) {
+    const providerConfig = getProviderConfig(provider);
+    if (providerConfig) {
+      provider_api_key = providerConfig.apiKey;
+      provider_api_base = providerConfig.apiBase;
+    }
+  }
+
   return {
     llm: llm || "auto",
     agent_max_turns: agent_max_turns || "auto",
     agent_accuracy: agent_accuracy || "standard",
     agent_total_timeout: agent_total_timeout,
+    provider,
+    provider_api_key,
+    provider_api_base,
   };
 }
