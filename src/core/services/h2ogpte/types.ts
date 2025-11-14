@@ -106,3 +106,24 @@ export interface JobDetails {
   timeout?: number;
   start_time?: number;
 }
+
+/**
+ * LLM Provider configuration
+ */
+export interface LLMProvider {
+  id: string;
+  name: string;
+  apiKeyEnvVar: string;
+  apiBaseEnvVar?: string;
+  defaultApiBase?: string;
+  modelOptions: string[];
+}
+
+/**
+ * Extended H2ogpteConfig with LLM provider information
+ */
+export interface ExtendedH2ogpteConfig extends H2ogpteConfig {
+  provider?: string;
+  provider_api_key?: string;
+  provider_api_base?: string;
+}
